@@ -1,0 +1,1555 @@
+    ICL 'sistema.asm'
+    ICL 'romram.asm'
+    ICL 'macros.asm'
+PRINTBYTE   = $F2B0
+GETBYTE     = $F2F8
+TURBO = $B3
+    ORG $D301
+    .BY $FE
+    ORG $BC20
+    .BY 1
+    .WO NEWDL
+VOLVERE
+    ORG $BB00
+NEWDL
+    .BY 112,112,66
+    .WO LINE0
+    .BY 48,1
+    .WO VOLVERE
+LINE0
+    .SB +128,"  CON "
+    .SB "S"
+    .SB +128,"ubrutina  < 4k"
+C?
+    .SB +128," Bps>  SIN "
+    .SB "R"
+    .SB +128,"eset   "
+CON .SB +128,"CON"
+SIN .SB +128,"SIN"
+    ORG $8000
+CANTR   .WORD $4000
+CANTW   .WORD $4000
+LASTCANT    .WORD $4000
+FRO = $D4
+RAM = $CB
+ROM = $CD
+FEOR    .BY 0
+FEOF    .BY 0
+BANCO   .BY 0
+GUARDABANCO     .BY 0
+SAVEL   .DBYTE 0
+SUB
+    JSR USERSUB+Z
+SINRES
+    JMP $0392
+CONRES
+    JMP ($FFFC)
+;
+ALL
+    .BY 'D:*.*'
+MENSAJE1
+    .BY '  ELIJA FILE A GRABAR!',EOL
+MENSAJE2
+    .BY $7D,'  INGRESE DISCO CON FILE A GRABAR',EOL
+MENSAJE3
+    .BY $7D,'   RETURN PARA COMENZAR GRABACION',EOL
+STRING
+    .BYTE 'D1:'
+NOMBRE
+    .BY '                                         '
+PABONITO
+    .SB "000  BLOQUES A GRABAR "
+BANQUEO
+    ORA #$08
+    CLC 
+    ROL
+    ROL
+    PHA 
+    LDA #$C3
+    AND $D301
+    STA $D301
+    PLA 
+    ORA $D301
+    AND #$FE
+    STA $D301
+    RTS 
+SUBCLOSE
+    CLOSE  1
+    RTS 
+SUBOPEN
+    OPEN  1,4,128,STRING
+    BPL OPENOK
+    JSR SUBCLOSE
+    JSR SUBDIRECTORIO
+    JMP SUBOPEN
+OPENOK
+    RTS 
+SUBBGET
+    BGET  1,$4000,CANTR
+    RTS
+SUBREAD
+    JSR SUBOPEN
+    LDA #$04
+    STA BANCO
+LOOPBANCOS
+    DEC BANCO
+    LDA BANCO
+    JSR BANQUEO
+    JSR SUBBGET
+    LDA 856
+    CMP CANTR
+    BNE FINCARGA
+    LDA 857
+    CMP CANTR+1
+    BEQ LOOPBANCOS
+FINCARGA
+    LDA BANCO
+    STA GUARDABANCO
+    LDA 856
+    STA LASTCANT
+
+    STA FRO
+    LDA 857
+    STA LASTCANT+1
+    STA FRO+1
+    
+;sacamos el calculo
+    LDX #$02
+    LDA #$90
+VUELVEA0
+    STA PABONITO,X
+    LDY FEOR
+    BEQ NOEORFF
+    EOR #$FF
+NOEORFF
+    DEX 
+    BPL VUELVEA0
+    LDX #$03
+CALCULOASC
+    CPX GUARDABANCO
+    BEQ NOFINCALCULO
+    CLC
+    LDA FRO
+    ADC CANTR
+    STA FRO
+    LDA FRO+1
+    ADC CANTR+1
+    STA FRO+1
+    DEX 
+    BPL CALCULOASC
+NOFINCALCULO
+    LDY #$01
+    LDA FRO
+    AND #$7F    ;7f=127 83=131
+    BEQ FINCALCULO
+    INY 
+FINCALCULO
+    LDX #$06
+LOOPFINCALCULO
+    LSR FRO+1
+    ROR FRO
+    DEX 
+    BPL LOOPFINCALCULO
+    CLC 
+    TYA 
+    ADC FRO
+    STA FRO
+    LDA FRO+1
+    ADC #$00
+    STA FRO+1
+    JSR $D9AA
+    JSR $D8E6
+    LDY #$00
+LOOPPOSITIVO
+    LDA ($F3),Y
+    BMI ESNEGATIVO
+    INY 
+    BPL LOOPPOSITIVO
+ESNEGATIVO
+    SEC 
+    SBC #32
+    STA PABONITO+2
+    LDX FEOR
+    BEQ NOEORFF1
+    EOR #$FF
+NOEORFF1
+    DEY 
+    BMI NOQUEDANMAS
+    LDA ($F3),Y
+    ORA #$80
+    SEC 
+    SBC #32
+    STA PABONITO+1
+    LDX FEOR
+    BEQ NOEORFF2
+    EOR #$FF
+NOEORFF2
+    DEY 
+    BMI NOQUEDANMAS
+    LDA ($F3),Y
+    EOR #$80
+    SEC 
+    SBC #32
+    STA PABONITO
+    LDX FEOR
+    BEQ NOQUEDANMAS
+    EOR #$FF
+NOQUEDANMAS
+    JMP SUBCLOSE
+SUBDIRECTORIO
+;   LDA #'}
+    LDA #$7D
+    JSR PRINTBYTE
+    OPEN  1,6,0,ALL
+DIRECTORIO
+    ;INPUT  1,NOMBRE
+    LDX #$10
+    LDA #$05
+    STA ICCOM,X
+    LDA # <NOMBRE
+    STA ICBADR,X
+    LDA # >NOMBRE
+    STA ICBADR+1,X
+    LDA #$FF
+    STA ICBLEN,X
+    LDA #$00
+    STA ICBLEN+1,X
+    JSR CIO
+    BMI FINDIRECTORIO
+    PRINT 0,NOMBRE
+    JMP DIRECTORIO
+FINDIRECTORIO
+    JSR SUBCLOSE
+    LDA #$9B
+    JSR PRINTBYTE
+    LDA #$9B
+    JSR PRINTBYTE
+    PRINT 0,MENSAJE1
+    LDA #$FF
+    JSR BANQUEO
+    LDX #19
+    LDA #$00
+SINNOMBRE
+    STA NOMBRE,X
+    DEX 
+    BPL SINNOMBRE
+TOMEFILE
+    LDA $58
+    STA $00
+    LDA $59
+    STA $01
+INVIERTA
+    JSR INVERSO
+QUEAPRETO?
+    LDA #$FF
+    STA 764
+WTECLA
+    LDA 764
+    CMP #$FF
+    BEQ WTECLA
+    CMP #28
+    BNE NOOTRO
+    RTS 
+NOOTRO
+    CMP #62
+    BNE NOCSUB
+    LDX #$00
+    LDY #$02
+    LDA LINE0,Y
+    CMP #$23
+    BEQ PONSINSUB
+PONCONSUB
+    LDA CON,X
+    STA LINE0,Y
+    LDA SUB,X
+    BIT FEOR
+    BEQ NOEOR29A
+    EOR #$29
+NOEOR29A
+    STA CONSUBRUTINA,X
+    INY 
+    INX 
+    CPX #$03
+    BNE PONCONSUB
+    BEQ QUEAPRETO?
+PONSINSUB
+    LDA SIN,X
+    STA LINE0,Y
+    LDA #$EA
+    BIT FEOR
+    BEQ NOEOR29B
+    EOR #$29
+NOEOR29B
+    STA CONSUBRUTINA,X
+    INY 
+    INX 
+    CPX #$03
+    BNE PONSINSUB
+    BEQ QUEAPRETO?
+NOCSUB
+    CMP #40
+    BNE NOCRES
+    LDX #$00
+;   LDY #28     ;BORRADO
+    LDY #25     ;SUMADO
+    LDA LINE0,Y
+;   CMP #'C-32  ;BORRADO
+    CMP #$A3
+    BEQ PONSINRES
+PONCONRES
+    LDA CON,X
+    STA LINE0,Y
+    LDA CONRES,X
+    BIT FEOR
+    BEQ NOEOR29C
+    EOR #$29
+NOEOR29C
+    STA SINRESET,X
+    INY 
+    INX 
+    CPX #$03
+    BNE PONCONRES
+    JMP QUEAPRETO?
+PONSINRES
+    LDA SIN,X
+    STA LINE0,Y
+    LDA SINRES,X
+    BIT FEOR
+    BEQ NOEOR29D
+    EOR #$29
+NOEOR29D
+    STA SINRESET,X
+    INY 
+    INX 
+    CPX #$03
+    BNE PONSINRES
+    JMP QUEAPRETO?
+NOCRES
+    CMP #15
+    BNE NOUPALE
+    JSR INVERSO
+    CLC 
+    LDA $00
+    ADC #40
+    STA $00
+    LDA $01
+    ADC #$00
+    STA $01
+    LDY #$03
+    LDA ($00),Y
+    BEQ NOTOMEFIL
+    JMP TOMEFILE
+NOTOMEFIL
+    JMP INVIERTA
+NOUPALE
+    CMP #14
+    BNE NOBAJALE
+    JSR INVERSO
+    LDA $00
+    CMP $58
+    BNE BAJE
+    LDA $01
+    CMP $59
+    BNE BAJE
+    JMP TOMEFILE
+BAJE
+    SEC 
+    LDA $00
+    SBC #40
+    STA $00
+    LDA $01
+    SBC #$00
+    STA $01
+    JMP INVIERTA
+NOBAJALE
+    CMP #12
+    BEQ ELCOK
+    JMP QUEAPRETO?
+ELCOK
+    JSR INVERSO
+    LDY #$04
+    LDX #$00
+ESTAFILE
+    LDA ($00),Y
+    BEQ PUNTO
+    CLC 
+    ADC #$20
+    STA NOMBRE,X
+    INX 
+    INY 
+    CPY #$0C
+    BNE ESTAFILE
+PUNTO
+    LDY #$0C
+;   LDA #'.
+    LDA #$2E
+    STA NOMBRE,X
+    INX 
+LOPUNTO
+    LDA ($00),Y
+    BEQ FINPUNTO
+    CLC 
+    ADC #$20
+    STA NOMBRE,X
+    INX 
+    INY 
+    CPY #$0F
+    BNE LOPUNTO
+FINPUNTO
+    RTS 
+INVERSO
+    LDY #$0F
+LOINVIERTO
+    LDA ($00),Y
+    EOR #$80
+    STA ($00),Y
+    DEY 
+    CPY #$03
+    BNE LOINVIERTO
+    RTS
+;
+;
+;
+;       INICIO PROGRAMA
+;
+;
+;
+INICIOPROGRAMA
+    ;LDA #$00
+    ;STA FEOR
+    ;LDA #$FE
+    ;STA $D301
+    LDA #$01    ;
+    STA $0244   ; RESET=BOOT
+    LDA #112    ;
+    STA 16      ; BREAK
+    STA 53774   ; KEY DISABLED
+    LDA #$60    ;
+    STA 65020   ; NO BEEP BEEP
+    LDA #$00    ;
+    STA 710     ; SCREEN BLACK
+    LDA #1      ;
+    STA 752     ; CURSOR OFF
+    LDX $62     ; PAL FLAG
+    LDA # <$0348 ; SET LEADER
+    STA SAVEL   ; EN 14 SEG.
+    STA $FE8F,X ; Y LO GUARDA
+    LDA # >$0348 ; PARA PROXIMA
+    STA SAVEL+1 ; GRABACION.
+    STA $FE8D,X ;
+    LDA #$34    ; NO CORTE EL
+    STA $FDD7   ; MOTOR
+;               ;
+CAMBIADISCO
+    PRINT 0,MENSAJE2
+    LDA #$FF
+    STA 764
+    JSR GETBYTE
+    JSR SUBDIRECTORIO
+    JSR SUBREAD
+OTRACOPIA
+    PRINT 0,MENSAJE3    ;RETURN PARA COMENZAR GRABACION
+    LDY #130
+    LDX #$00
+LOOPBONITO
+    LDA PABONITO,X
+    STA ($58),Y
+    INY 
+    INX 
+    CPX #21
+    BNE LOOPBONITO
+    LDY #216
+    LDX #$00
+BELLO
+    LDA NOMBRE,X
+    SEC 
+    SBC #$20
+    BMI FINBELISIMO
+    STA ($58),Y
+    INY 
+    INX 
+    BNE BELLO
+FINBELISIMO
+    LDA #$FF
+    STA 764
+    JSR GETBYTE
+;   CMP #'?
+    CMP #$1B
+    BNE NOCAMBIADISCO
+    JMP CAMBIADISCO
+NOCAMBIADISCO
+;   LDA #'}
+    LDA #$7D
+    JSR $F2B0
+;IMPRIMIMOS EN PANTALLA LOS BLOQUES A GRABAR
+    LDX #$00    ;3
+    LDY #215    ;217
+NUMEROSCREEN
+    LDA PABONITO,X
+    STA ($58),Y
+    INY 
+    INX 
+    CPX #$03
+    BNE NUMEROSCREEN
+    INY
+NOMBRESCREEN
+    LDA STRING,X
+    SEC 
+    SBC #$20
+    BMI ENDNAME
+    STA ($58),Y
+    INX 
+    INY 
+    BNE NOMBRESCREEN
+ENDNAME
+;SUMANDO LOS 9 DE INJEKTOR DE DATA
+    LDX #$05    ;ES 8
+NUEVEBLKS
+    LDY #217
+NUEVEBLKS1
+    LDA ($58),Y
+    CLC 
+    ADC #$01
+;   CMP #'9-31
+    CMP #$9A
+    BEQ NUEVE9
+    STA ($58),Y
+    DEX 
+    BPL NUEVEBLKS
+    BMI FINNUEVE
+NUEVE9
+;   LDA #'0-32
+    LDA #$90
+    STA ($58),Y
+    DEY 
+    CPY #214
+    BNE NUEVEBLKS1
+FINNUEVE
+    LDA #$FF
+    JSR BANQUEO
+;
+    LDA #$CC    ;--------------
+    STA $EBA3   ; BAUD RATE
+    STA $FD41   ; NORMAL PARA
+    LDA #$05    ; GRABACION DE
+    STA $EBA8   ; ENCABEZADO
+    STA $FD46   ;--------------
+;
+    LDA #$08    ; FSK ON
+    STA $EC26   ;--------------
+;
+;
+;
+    JSR GRABABLKUNO
+;
+; GRABAMOS EL LOADER INJEKTOR
+; 9 BLOQUES CON DATA
+;
+    LDA #$D9    ;--------------
+    STA $EBA3   ; BAUD RATE
+    STA $FD41   ; A 4000 BPS.
+    LDA #$00    ; PARA GRABAR
+    STA $EBA8   ; PROGRAMAS
+    STA $FD46   ;--------------
+;
+    LDA #$00    ; FSK OFF
+    STA $EC26   ;--------------
+;
+    LDA #$00
+    STA FEOF
+    LDA # <(FIN-LOADERGAME)   ;4430-4000
+    STA CANTW
+    LDA # >(FIN-LOADERGAME)
+    STA CANTW+1
+    LDX $62     ; PAL FLAG
+    LDA #180    ; 2 SEGUNDOS
+    STA $FE8F,X ; PRIMER
+    LDA #$00    ; LEADER
+    STA $FE8D,X ; 4K BPS
+;
+;
+;   GRABAMOS EL JUEGO
+    JSR WRITETOCASSETTE
+;
+;
+;
+    LDX #$00    ; BUFFER
+    STX $3D     ; VACIO
+;
+; SEGUNDO BLOQUE EN 4K
+;
+    CLC 
+    LDA 20
+    ADC #30     ; 1/2 SEG.
+PAUSEMEDIO
+    CMP 20
+    BNE PAUSEMEDIO
+    LDA #1
+    STA FEOF
+    LDA CANTR
+    STA CANTW
+    LDA CANTR+1
+    STA CANTW+1
+    LDA #$04
+    STA BANCO
+;
+;
+;
+    JSR WRITOCAS
+;
+;
+;
+    LDA #$3C
+    STA $D302   ; MOTOR OFF
+    LDX $62     ; RESTAURA
+    LDA SAVEL   ; LEADER
+    STA $FE8F,X ; PARA
+    LDA SAVEL+1 ; SEGUNDA
+    STA $FE8D,X ; GRABACION
+    JMP OTRACOPIA
+WRITETOCASSETTE
+    JSR $FD34
+WRITOCAS
+    LDA #$80    ;80
+    STA $3E
+    LDA FEOF
+    BEQ NOLASTBANCO
+GRABANDOP02
+    DEC BANCO
+    LDA BANCO
+    PHA 
+    JSR BANQUEO
+    PLA 
+    CMP GUARDABANCO
+    BNE NOLASTBANCO
+    LDA LASTCANT
+    STA CANTW
+    LDA LASTCANT+1
+    STA CANTW+1
+    LDA #$FF
+    STA FEOF
+NOLASTBANCO
+    LDA # <$4000
+    STA $00
+    LDA # >$4000
+    STA $01
+    LDA #$00
+    STA $02
+    STA $03
+WRITECASSETTE
+    LDA $D01F
+    CMP #$03
+    BNE SIGAGRBANDO
+    RTS 
+SIGAGRBANDO
+    LDY #$00
+    LDA ($00),Y
+    JSR $FDB4
+    BNE NONUEVOBLK
+    LDY #135
+BUFSCREEN
+    LDA $03FF,Y
+    STA ($58),Y
+    DEY 
+    BNE BUFSCREEN
+    ;CONTADOR DE BLOQUES EN DECENSO
+    
+    LDY #217
+    LDX #$02
+DECBELLO
+    LDA ($58),Y
+    SEC
+    SBC #$01
+    ;CMP #'0-33
+    CMP #$8F
+    BEQ NINEBELLO
+    STA ($58),Y
+    BNE FINBELLO
+NINEBELLO
+    ;LDA #'9-32
+    LDA #$99
+    STA ($58),Y
+    DEY
+    DEX
+    BPL DECBELLO
+FINBELLO
+    INC $0480
+    BNE NONUEVOBLK
+    INC $0481
+NONUEVOBLK
+    INC $00
+    BNE NOINCHIBIS
+    INC $01
+NOINCHIBIS
+    INC $02
+    BNE NOINCHIS
+    INC $03
+NOINCHIS
+;
+    LDA $03
+    CMP CANTW+1
+    BNE WRITECASSETTE
+    LDA $02
+    CMP CANTW
+    BNE WRITECASSETTE
+    LDA FEOF
+    BEQ FINP01
+    BMI FINP01
+    JMP GRABANDOP02
+;
+FINP01
+    LDX $3D
+    BEQ TERMINOWRITE
+    STX $047F
+    LDA #$FA
+    JSR $FE7C
+TERMINOWRITE
+    LDA FEOF
+    BNE SIEOF
+    RTS 
+SIEOF
+    LDX #$7F
+    LDA #$00
+FILLBUFFER
+    STA $0400,X
+    STA $D40A
+    DEX 
+    BPL FILLBUFFER
+    LDA #$FE
+    JSR $FE7C
+    JMP $FDD6
+    RUN INICIOPROGRAMA
+EORLEN = FINFIRST-AEOREAR+1
+ADR =   $0380-3
+RESTABYTE = $03FF
+DIF =   $A000-ADR
+;PRIMER BLOQUE LOADER A 600 BAUDIOS
+    ORG ADR+DIF
+AGRABAR
+    .BY $55,$55
+    .BY $FA
+BLKUNO
+    .BY $00
+    .BY $01
+    .WO *-2-DIF
+    .WO $E456
+;
+;
+    LDX #EORLEN
+    TXS 
+EORLOOP
+    SEC 
+    LDA AEOREAR-DIF,X
+    TAY 
+    SBC RESTABYTE
+    STY RESTABYTE
+    PHA 
+    DEX 
+    BPL EORLOOP
+    RTS
+;FIN PRIMER BLOQUE 
+;
+;
+AEOREAR
+    .BY $01   ; RTS A $102
+    .BY $01
+    LDX #$01
+    STX $0244
+    DEX 
+    STX $022F
+    STX $D400
+    STX $41     ; $00 41
+    LDX #$0B
+TRANSFER
+    LDA DATIX1-DIF,X
+    STA $0300,X
+    DEX 
+    BPL TRANSFER
+    JSR $E459
+    LDX #$FF
+    TXS 
+    JMP ($0304)
+FINFIRST
+    PLA 
+    RTI 
+DATIX1
+    .BY $60
+    .BY $00
+    .BY $52
+    .BY $40
+    .WO BLKFALSO
+    .BY $23
+    .BY $00
+    .WO FINBLKFALSO-BLKFALSO
+    .BY $00
+    .BY $80
+    ORG $03EA+DIF
+    .BYTE $00
+;
+    ORG AGRABAR+$84
+GRABABLKUNO
+    LDX FEOR
+    BNE EORLISTO
+    LDX #EORLEN
+    STX FEOR
+EORLOOP1
+    CLC 
+    LDA AEOREAR,X
+    ADC SUMABYTE
+    STA SUMABYTE
+    STA AEOREAR,X
+    DEX 
+    BPL EORLOOP1
+    LDA #0
+    STA CHKSUM
+    LDX #$82
+    LDA #$01
+    STA AGRABAR,X
+ADCHKSUM
+    LDA AGRABAR,X
+    CLC 
+    ADC CHKSUM
+    ADC #0
+    STA CHKSUM
+    DEX 
+    CMP #$FF
+    BNE ADCHKSUM
+    LDX #$83
+    STA BLKUNO,X
+EORLISTO
+    JSR $FD34   ; GRABA LEADER
+    LDX #$0B
+?LOOP
+    LDA DATA1,X ; BLOQUE 1
+    STA $0300,X ; (BOOT)
+    DEX 
+    BPL ?LOOP
+    JSR $E459   ; GRABA PRIMER BLOQUE
+;
+;
+;  -----------------------
+;     GRABA XL INJEKTOR
+;  -----------------------
+;
+;
+    CLC 
+    LDA 20
+    ADC #$09
+IRGINJECTOR
+    CMP 20
+    BNE IRGINJECTOR
+    LDX #$0B
+SAVEFALSO
+    LDA DATAFALSA,X
+    STA $0300,X
+    DEX 
+    BPL SAVEFALSO
+    JSR $E459
+    RTS 
+CHKSUM
+    .BY 0
+DATA1
+    .BY $60,0,$57,$80
+    .WO AGRABAR
+    .BY $23,0
+    .WO $83
+    .BY 0,$80
+DATAFALSA
+    .BY $60,0,$57,$80
+    .WO BLKFALSO
+    .BY $23,0
+    .WO FINBLKFALSO-BLKFALSO
+    .BY 0,$80
+SUMABYTE
+    .BY $FA
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;
+;  SEGUNDO BLOQUE (LARGO)
+;
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ORG  $5000
+BLKFALSO
+    .BYTE $55,$55
+    TYA 
+    BPL BLOCKOK
+    JMP ($FFFC)
+BLOCKOK
+    LDA #$00
+    LDA # <DLILOGO
+    STA $0230
+    LDA # >DLILOGO
+    STA $0231
+    LDA #$22
+    STA $D400
+    STA $022F
+    JSR ROMARAM
+    JSR INSTALE ; BAUD RATE
+;
+    LDA #$0C    ; POKE 764,12
+    STA $02FC
+    LDX $62     ; PAL FLAG
+    LDA #$01    ; LEADER
+    STA $FE93,X ; DE LECTURA
+    LDA #$00    ; EN 1/30
+    STA $FE91,X ; SEGUNDOS
+    STA $D01A
+    LDA #$EA    ; NO BUSQUE
+    STA $C61B   ; EOF
+    STA $C61C
+    STA $C61D
+;
+    CLC         ; ESPACIO
+    LDA 20      ; ENTRE 600
+    ADC #120    ; Y 4K
+WAITFOR4000
+    CMP 20
+    BNE WAITFOR4000
+    JMP $C680
+;       .INCLUDE #D:ROMARAM.MAC
+;
+;
+;
+;  --------------------------
+;     AQUI VA EL PROGRAMA
+;        'XL INJECTOR'
+;    (COMO UN SOLO BLOQUE)
+;  --------------------------
+;
+;
+;
+; SAVE#D:ROMARAM.MAC
+;
+; TRASPASA EL AREA DE ROM
+; ($C000-$D000,$D800-$FFFF)
+; A RAM ($6000-$9FFF),
+; DECONECTA EL ROM Y MUEVE
+; EN SENTIDO INVERSO.
+;
+;
+;
+ROMARAM
+    LDA #$60
+    PHA 
+    TAX 
+    LDA #$00
+    PHA 
+    TAY 
+    STY ROM
+    STY RAM
+REENTRE
+    STX RAM+1
+    LDX #$C0
+LOOPCITO
+    STX ROM+1
+LOOP1
+    LDA (ROM),Y
+    STA (RAM),Y
+    DEY 
+    BNE LOOP1
+    INC RAM+1
+    INC ROM+1
+    INX 
+    BEQ ROMOFF
+    CPX #$D0
+    BNE LOOP1
+    LDX #$E0    ; NO COPIE F.P.
+    BNE LOOPCITO
+ROMOFF
+    SEI 
+    PLA 
+    STA $D40E
+    LDA $D301
+    AND #$FE
+    STA $D301
+RETURN
+    LDA #RAM
+    STA LOOP1+1
+    LDA #ROM
+    STA LOOP1+3
+    LDA #$60
+    STA ROMOFF+5
+    LDA #$58
+    STA ROMOFF
+    LDX #$60
+    JMP REENTRE
+DLILOGO
+    .BY $70,$70,$70,$46
+    .WO LOGOTURBO
+    .BY $70,$70,$70,$70,$70,$70
+    .BY $70,$70,,$70,$70,$41
+    .WO DLILOGO
+LOGOTURBO
+    .SB "   tur"
+    .SB "bo SOF"
+    .SB "TWARE "
+    .SB "  "
+;
+;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;
+;    CALCULO BAUD RATE
+;
+;
+; - POR PERIODOS DE RELOJ
+; - PRESICION:
+;   MINIMO BAUD RATE 3400
+;   MAXIMO BAUD RATE 10000
+;
+;
+;
+; INSTALA EL CAMBIO DE
+; LLAMADO A SUBRUTINA
+; APUNTANDO AL NUEVO
+; CALCULO.
+;
+;
+;
+INSTALE
+    LDY #$02
+LOOPINSTALE
+    LDA EBFE,Y
+    STA $EBFE,Y
+    DEY 
+    BPL LOOPINSTALE
+;
+;
+; INSTALA CALCULO
+;
+CALCULO = $CB80
+LENCALC = FINBLKFALSO-CALCULORAM
+;
+    LDY #LENCALC
+LOOPINSTALE1
+    LDA CALCULORAM,Y
+    STA CALCULO,Y
+    DEY 
+    BPL LOOPINSTALE1
+;
+;
+;
+    LDA #$01    ; IRG 1/60 SEG.
+    LDX $62     ; PAL FLAG
+    STA $EE17,X ; EN LECTURA!
+;
+;
+;
+;
+;
+    LDA #$60
+    STA $FDFC   ; NO BEEP
+;
+;
+;
+    RTS 
+;
+;
+;  FIN INSTALACION RUTINAS!
+;
+;
+;
+;
+;
+EBFE
+    JSR CALCULO
+;
+;
+BRATE = $02EE
+CALCULORAM
+    SEI 
+    LDA #$00
+    STA $D40E
+    STA $D400
+    STA BRATE
+    STA BRATE+1
+    LDA $D20F
+    AND #$10
+    STA $0316
+STARTBIT
+    LDA $D20F
+    AND #$10
+    CMP $0316
+    BEQ STARTBIT
+    STA $0316
+    LDY #$0A
+BAUDRATE
+    INC BRATE
+    LDA $D20F
+    AND #$10
+    CMP $0316
+    BEQ BAUDRATE
+    STA $0316
+    DEY 
+    BNE BAUDRATE
+    LDY #$09
+BITSDEMAS
+    LDA $D20F
+    AND #$10
+    CMP $0316
+    BEQ BITSDEMAS
+    STA $0316
+    DEY 
+    BNE BITSDEMAS
+    CLC 
+    LDA BRATE
+    ADC #$04
+    STA BRATE
+    LDA #$40
+    STA $D40E
+    LDA $D20A   ; RANDOM
+    STA $D01A   ; COLO FONDO
+    JMP $ED96
+FINBLKFALSO
+;
+;
+;
+;   ------------------------
+;       CARGADOR DE FILES
+;          (BOOT PURO)
+;   ------------------------
+;
+;       .OPT LIST
+;
+    ORG  $4000
+Z =   $D800-*
+;
+;
+
+;data de injektor
+LOADERGAME
+    .BY $00
+    .BY [FIN-LOADERGAME]/128+1
+    .WO LOADERGAME+Z
+    .WO $E474
+    JMP COMIENZOLOAD+Z
+SETCANT
+    LDX #$10
+    STA $0348,X
+    TYA 
+    STA $0349,X
+    RTS 
+READ2
+    LDA #$02
+    LDY #$00
+    JSR SETCANT+Z
+READ3
+    LDA # <(FIN+Z)
+    LDY # >(FIN+Z)
+SETPOS
+    STA $0344,X
+    TYA 
+    STA $0345,X
+    LDA #$07
+    STA $0342,X
+    JSR $E456
+    BMI SETPOS?
+    JMP NOEOF+Z
+SETPOS?      
+    CPY #136    ; EOF?
+    BNE SINSETPOS
+    JMP ENDOFFILE+Z
+SINSETPOS
+    DEC FBOOT+1+Z
+    BEQ ONERR
+    LDX #$10
+    LDA #$0C
+    STA $0342,X
+    JSR $E456
+    LDA #$3C
+    STA $D302
+    LDA $14
+    ADC #$1E
+SERAPOS?
+    CMP $14
+    BNE SERAPOS?
+    LDA #$34
+    STA $D302
+    LDA $14
+    ADC #$14
+VEOPOS
+    CMP $14
+    BNE VEOPOS
+ESRAN
+    LDA $D20A
+    STA $D01A
+    LDA $14
+    ADC #$96
+    STA FBOOT+2+Z ;8D F0 DA
+ESRAN?
+    LDA $D20F
+    AND #$10
+    BEQ ESRAN
+    LDA $14
+    CMP FBOOT+2+Z ;CD F0 DA
+    BNE ESRAN?
+    LDA #$00
+    STA $D01A
+    LDX #$FF
+    TXS
+    JMP COMIENZOLOAD?+Z ;4C 09 D9
+ONERR
+    JSR $EF8E
+    LDA #60
+    STA 54018
+    LDX #$00
+    STX 82
+    STX 710
+    INX 
+    STX 752
+    STX 580
+    LDA # <(TEXTTRAP+Z) ;A9 F4
+    STA $00
+    LDA # >(TEXTTRAP+Z)
+    STA $01
+    LDA #34
+    STA 559
+PRINTERR
+    LDY #$00
+    LDA ($00),Y
+;   CMP #'@
+    CMP #$40
+    BEQ FINTRAP
+    JSR $F2B0
+    INC $00
+    BNE PRINTERR
+    INC $01
+    BNE PRINTERR
+FINTRAP
+    LDA #$FF
+    STA 764
+RETURN?
+    LDX 764
+    CPX #$0C
+    BNE RETURN?
+LOOPREBOOT
+    LDA REBOOT+Z
+    STA $2000,X
+    DEX 
+    BPL LOOPREBOOT
+    LDA #$00
+    STA $0244
+    STA $02
+    LDA #$20
+    STA $03
+    LDA #$02
+    STA $09
+    JMP ($FFFC)
+REBOOT
+    LDA #$FF
+    STA $D301
+    LDA #$0C
+    STA 764
+    JMP $C680
+ENDOFFILE
+    JMP INICIOBOOT+Z    ;4C FE D9
+NOEOF
+    LDX #$10
+    RTS 
+COMIENZOLOAD
+    LDA #$05
+    STA FBOOT+1+Z    ;$DAEF
+    LDA #$00
+    STA $09
+    STA $0A
+    STA $0B
+    STA $0C
+    STA $0D
+COMIENZOLOAD?
+    LDX #$04
+    STX $01
+    LDA #$00
+    STA $00
+    STA 559
+    STA $D400
+    TAY 
+ERASERAM
+    STA ($00),Y
+    INY 
+    BNE ERASERAM
+    INC $01
+    INX 
+PONERC0
+    CPX #$C0
+    BNE ERASERAM
+OPENC
+    LDX #$FF
+    STA $0340
+    LDX #$10
+    LDA #$03
+    STA $0342,X
+    LDA # <(DEVICE+Z)
+    STA $0344,X
+    LDA # >(DEVICE+Z)
+    STA $0345,X
+    LDA #$04
+    STA $034A,X
+    LDA #$80
+    STA $034B,X
+    LDA #$0C
+    STA 764
+    JSR $E456
+    BPL ZREAD
+    JMP SINSETPOS+Z ;4C 39 D8
+ZREAD
+    JSR READ2+Z
+    LDA FIN+Z   ;AD 3B DC
+    AND FIN+1+Z ;2D 3C DC
+    CMP #$FF
+    BNE SERABOOT?
+    LDA # <$E474
+    STA TEMPO+Z
+    LDA # >$E474
+    STA TEMPO+1+Z
+    LDA #$01
+    STA FBOOT+Z
+    BNE ZREAD
+SERABOOT?
+    LDA $02E0
+    ORA $02E1
+    BNE RUNOK
+    LDA FIN+Z   ;AD 3B DC
+    STA $02E0
+    LDA FIN+1+Z ;AD 3C DC
+    STA $02E1
+RUNOK
+    LDA FBOOT+Z
+    BNE NOESBOOT
+    JMP ESBOOT+Z
+NOESBOOT
+    LDA FIN+Z   ;AD 3B DC
+    STA $0240
+    LDA FIN+1+Z ;AD 3C DC
+    STA $0241
+    JSR READ2+Z
+    SEC
+    LDA FIN+Z   ;AD 3B DC
+    SBC $0240
+    STA $0348,X
+    LDA FIN+1+Z ;AD 3C DC
+    SBC $0241
+    STA $0349,X
+    INC $0348,X
+    BNE NOCARRYY
+    INC $0349,X
+NOCARRYY
+    LDA $0240
+    LDY $0241
+    JSR SETPOS+Z
+    LDA $02E2
+    ORA $02E3
+    BEQ NOSUBRUTIN
+CONSUBRUTINA
+;SUBRUTINA QUE ESTA DE MÁS
+    .BY $EA,$EA,$EA,$5C,$E4
+    .BY $8D,$53,$E4,$8D,$77
+    .BY $E4,$85,$00
+;
+    JSR USERSUB+Z
+    LDA #$4C
+    STA $E45C
+    STA $E453
+    STA $E477
+    LDA #$52
+    STA $0302
+    LDA #$00
+    STA $02E2
+    STA $02E3
+NOSUBRUTIN
+    JMP ZREAD+Z
+USERSUB
+    JMP ($02E2)
+CORREPROGRAMA
+    LDA #$FF
+    STA $D301
+    LDA #$00
+    JMP ($02E0)
+INICIOBOOT
+    LDA #$3C
+    STA $D302
+;   LDX #$07
+    LDX #$09
+LLEVARAM
+    LDA CORREPROGRAMA+Z,X
+    STA $0392,X
+    DEX 
+    BPL LLEVARAM
+    LDA #$01
+    STA $03F8
+    LDA #$E0
+    STA $D409
+    LDX #$FF
+    TXS 
+    LDA #$00
+    STA $026F
+    STA $D407
+    LDX #$1F
+ESRAM
+    STA $D000,X
+    DEX 
+    BPL ESRAM
+    LDA #$00
+    STA $0244
+    LDA $09
+    BNE ESRAM?
+    LDA #$02
+    STA $09
+ESRAM?
+    LDX $02E0
+    STX $02
+    LDY $02E1
+    STY $03
+;   STA $0A
+;   LDA $02E1
+;   STA $03
+;   STA $0B
+;   LDA $0D
+;   PHA
+    LDA $0C
+;   PHA
+    ORA $0D
+    BNE NORAM
+    STX $0C
+    STY $0D
+NORAM
+    LDA $0A
+    ORA $0B
+    BNE FINNORAM
+    LDA TEMPO+Z
+    STA $0A
+    LDA TEMPO+1+Z
+    STA $0B
+FINNORAM
+    SEC 
+    LDA $0A
+    SBC #$01
+    TAX 
+    LDA $0B
+    SBC #$00
+    PHA 
+    TXA 
+    CLC 
+    LDA $14
+    ADC #$02
+SINRESET
+    CMP $14
+    BNE SINRESET
+    JMP $0392
+TEMPO
+    .BY 0,0
+    .BY "TURBO"
+ESBOOT
+    LDA FIN+Z   ;AD 3B DC
+    STA $0240
+    LDA FIN+1+Z ;AD 3C DC
+    STA $0241
+    JSR READ2+Z
+    CLC 
+    LDA FIN+Z   ;AD 3B DC
+    ADC #$06
+    STA $04
+    LDA FIN+1+Z ;AD 3C DC
+    ADC #$00
+    STA $05
+    JSR READ2+Z
+    LDA FIN+Z   ;AD 3B DC
+    STA $0C
+    LDA FIN+1+Z ;AD 3C DC
+    STA $0D
+    LDY #$06
+MULTIPLICA
+    ASL $0241
+    ROL $0240
+    DEY 
+    BPL MULTIPLICA
+    LDA $0240
+    STA $0349,X
+    LDA $0241
+    STA $0348,X
+    LDA $04
+    STA $0344,X
+    STA $02E0
+    LDA $05
+    STA $0345,X
+    STA $02E1
+    LDA #$07
+    STA $0342,X
+    JSR $E456
+    BPL NOBOTERR
+    CPY #136
+    BEQ NOBOTERR
+    JMP ONERR+Z
+NOBOTERR
+    SEC 
+    LDA $0C
+    SBC #$01
+    STA $0C
+    LDA $0D
+    SBC #$00
+    STA $0D
+    JMP INICIOBOOT+Z
+FBOOT
+    .BY 0,0,0   ;ACA ES
+DEVICE
+    .BY 'C:',$9B
+TEXTTRAP
+    .BY $7D
+    .BY +128,"SE DET"
+    .BY +128,"ECTO U"
+    .BY +128,"NA FAL"
+    .BY +128,"LA DUR"
+    .BY +128,"ANTE L"
+    .BY +128,"A CARG"
+    .BY +128,"A!"
+    .BY $9B
+    .BY $1D,$1D,$1D,$1D,$1D
+    .BY "- Rebo"
+    .BY "bine l"
+    .BY "a cint"
+    .BY "a hast"
+    .BY "a el c"
+    .BY "omienz"
+    .BY "o",$7F,$7F,"  d"
+    .BY "e la m"
+    .BY "isma",$9B
+    .BY "- Pres"
+    .BY "ione l"
+    .BY "as tec"
+    .BY "las PL"
+    .BY "AY y R"
+    .BY "ETURN",$9B
+    .BY $9B,$1D
+    .BY "- Si e"
+    .BY "l erro"
+    .BY "r se p"
+    .BY "roduce"
+    .BY " en re"
+    .BY "iterad"
+    .BY "as",$7F,$7F,"  "
+    .BY "ocasio"
+    .BY "nes:",$9B,$9B
+    .BY "  -Hum"
+    .BY "edezca"
+    .BY " una g"
+    .BY "asa li"
+    .BY "mpia e"
+    .BY "n alco"
+    .BY "hol",$9B
+    .BY "  -Lim"
+    .BY "pie cu"
+    .BY "idados"
+    .BY "amente"
+    .BY " el ca"
+    .BY "bezal "
+    .BY "y",$7F,$7F,"   "
+    .BY "el rod"
+    .BY "illo p"
+    .BY "resor",$9B
+    .BY "  -Con"
+    .BY "trole "
+    .BY "el azi"
+    .BY "mut de"
+    .BY " su gr"
+    .BY "abador"
+    .by "@"
+FIN
